@@ -136,10 +136,13 @@ do_request(get_echart_deviceid, #{<<"deviceid">> := DeviceId,<<"style">> := Styl
             case dgiot_parse:get_object(<<"Device">>, DeviceId) of
                 {ok, #{<<"objectId">> := DeviceId, <<"product">> := #{<<"objectId">> := ProductId}}} ->
                     case Style of
-                        <<"line">> ->
-                            dgiot_device_echart:get_echart_data(Channel, ProductId, DeviceId, Args);
                         <<"amis_table">> ->
-                            dgiot_device_echart:get_data_by_month(Channel, ProductId, DeviceId, Args)
+                            dgiot_device_echart:get_data_by_month(Channel, ProductId, DeviceId, Args);
+                        <<"echart_category">> ->
+                            dgiot_device_echart:get_data_by_echart_category(Channel, ProductId, DeviceId, Args);
+                        _ ->
+                            dgiot_device_echart:get_echart_data(Channel, ProductId, DeviceId, Args)
+
                     end;
                 _ ->
                     {error, <<"not find device">>}

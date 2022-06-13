@@ -21,7 +21,7 @@
 -include_lib("dgiot_tdengine/include/dgiot_tdengine.hrl").
 
 -export([get_echart_data/4]).
--export([get_data_by_month/4, get_keys/2,get_table/2]).
+-export([get_data_by_month/4,get_data_by_echart_category/4, get_keys/2,get_table/2]).
 
 get_echart_data(Channel, ProductId, DeviceId, Args) ->
     Query = maps:without([<<"productid">>, <<"deviceid">>], Args),
@@ -245,3 +245,45 @@ get_table(Results,Names) ->
                             end, [], Results),
     #{<<"status">> => 0, <<"msg">> => <<"ok">>, <<"data">> => #{<<"counts">> => Count ,<<"rows">> => TableData}}.
 
+
+get_data_by_echart_category(Channel, ProductId, DeviceId, Args) ->
+    %%    io:format("~s ~p Channel = ~p , ProductId = ~p, DeviceId = ~p    ~n",[?FILE,?LINE,Channel, ProductId, DeviceId]),
+    case dgiot_data:get({tdengine_os, Channel}) of
+        <<"windows">> ->
+            pass;
+        _ ->
+%%            io:format("~s ~p here ~n",[?FILE,?LINE]),
+%%           由月份获得起止时间
+            {ok,Count} = maps:find(<<"month_count">>,Args),
+            {StartTime, EndTime} = dgiot_datetime:last_month(Count),
+%%            取得key并分割转为list
+            {ok, K}  = maps:find(<<"keys">>,Args),
+            Keys = re:split(K,","),
+%%            由key提取其accu属性并生成sql命令
+            Res = case dgiot_product:lookup_prod(ProductId) of
+                      {ok, Product} ->
+%%                            io:format("~s ~p Product =~p , Keys = ~p ~n",[?FILE,?LINE,Product,Keys]),
+                          get_keys(Product, Keys);
+                      _ ->
+                          error
+                  end,
+%%            io:format("~s ~p Res = ~p~n",[?FILE,?LINE,Res]),
+            {ok,Sql} = maps:find(<<"sql">>,Res),
+            {ok,Names} = maps:find(<<"names">>,Res),
+%%            配置参数
+            TableName = ?Table(DeviceId),
+            Interval = <<"1d">>,
+            %%传入参数获得结果
+            case dgiot_device_tdengine:get_history_data2(Sql, Channel, TableName, Interval, ProductId, StartTime, EndTime) of
+%%                判断结果并转换格式
+                {ok, #{<<"results">> := Results}} ->
+%%                    io:format("~s ~p Results = ~p ~n",[?FILE,?LINE,Results]),
+                    Tabledata = get_table(Results,Names),
+%%                    io:format("~s ~p Tabledata = ~p ~n",[?FILE,?LINE,Tabledata]),
+                    {ok,Tabledata};
+                _ ->
+                    {ok, #{<<"code">> => 400, <<"msg">> => <<"no data">>}}
+            end
+
+
+    end.
